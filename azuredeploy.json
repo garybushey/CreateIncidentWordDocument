@@ -1,0 +1,297 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "PlaybookName": {
+            "defaultValue": "GenerateWordReport",
+            "type": "string"
+        }
+    },
+    "variables": {
+        "MicrosoftSentinelConnectionName": "[concat('MicrosoftSentinel-', parameters('PlaybookName'))]",
+        "Office365ConnectionName": "[concat('Office365-', parameters('PlaybookName'))]",
+        "WordonlinebusinessConnectionName": "[concat('Wordonlinebusiness-', parameters('PlaybookName'))]"
+    },
+    "resources": [
+        {
+            "properties": {
+                "provisioningState": "Succeeded",
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "$connections": {
+                            "defaultValue": {},
+                            "type": "Object"
+                        }
+                    },
+                    "triggers": {
+                        "Microsoft_Sentinel_incident": {
+                            "type": "ApiConnectionWebhook",
+                            "inputs": {
+                                "body": {
+                                    "callback_url": "@{listCallbackUrl()}"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                                    }
+                                },
+                                "path": "/incident-creation"
+                            }
+                        }
+                    },
+                    "actions": {
+                        "For_each": {
+                            "foreach": "@triggerBody()?['object']?['properties']?['Comments']",
+                            "actions": {
+                                "Append_to_array_variable": {
+                                    "runAfter": {
+                                        "Parse_JSON": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "AppendToArrayVariable",
+                                    "inputs": {
+                                        "name": "CommentText",
+                                        "value": {
+                                            "CommentLastModified": " @{formatDateTime(convertFromUtc(body('Parse_JSON')?['properties']?['lastModifiedTimeUtc'],'Eastern Standard Time'),'MM/dd/yyyy hh:mm tt')}",
+                                            "CommentOwner": "@{body('Parse_JSON')?['properties']?['author']?['name']}",
+                                            "CommentOwnerEmail": " @{body('Parse_JSON')?['properties']?['author']?['email']}",
+                                            "CommentText": "@{body('Parse_JSON')?['properties']?['message']}"
+                                        }
+                                    }
+                                },
+                                "Parse_JSON": {
+                                    "runAfter": {},
+                                    "type": "ParseJson",
+                                    "inputs": {
+                                        "content": "@items('For_each')",
+                                        "schema": {
+                                            "properties": {
+                                                "etag": {
+                                                    "type": "string"
+                                                },
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "name": {
+                                                    "type": "string"
+                                                },
+                                                "properties": {
+                                                    "properties": {
+                                                        "author": {
+                                                            "properties": {
+                                                                "email": {
+                                                                    "type": "string"
+                                                                },
+                                                                "name": {
+                                                                    "type": "string"
+                                                                },
+                                                                "objectId": {
+                                                                    "type": "string"
+                                                                },
+                                                                "userPrincipalName": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "type": "object"
+                                                        },
+                                                        "createdTimeUtc": {
+                                                            "type": "string"
+                                                        },
+                                                        "lastModifiedTimeUtc": {
+                                                            "type": "string"
+                                                        },
+                                                        "message": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "type": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            },
+                            "runAfter": {
+                                "Initialize_variable": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Foreach"
+                        },
+                        "Initialize_variable": {
+                            "runAfter": {},
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "CommentText",
+                                        "type": "array"
+                                    }
+                                ]
+                            }
+                        },
+                        "Populate_a_Microsoft_Word_template": {
+                            "runAfter": {
+                                "For_each": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "metadata": {
+                                "01A6SSJRCJQYGOV2GVYNDZLKY35YF5TRTM": "/General/Incident Name.docx",
+                                "01A6SSJRCL4DAUG5ZB3FE3657YUIIRHDZE": "/General/Incident Name.docx"
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "712392628": "@triggerBody()?['object']?['properties']?['severity']",
+                                    "770432536": "@triggerBody()?['object']?['properties']?['description']",
+                                    "852614304": "@{triggerBody()?['object']?['properties']?['additionalData']?['tactics']}",
+                                    "1380595302": "@variables('CommentText')",
+                                    "1537086795": "@triggerBody()?['object']?['properties']?['classificationReason']",
+                                    "-1200006512": "@triggerBody()?['object']?['properties']?['title']",
+                                    "-122779671": "@triggerBody()?['object']?['properties']?['classificationComment']",
+                                    "-148914755": "@{triggerBody()?['object']?['properties']?['additionalData']?['techniques']}",
+                                    "-1579437457": "@{triggerBody()?['object']?['properties']?['incidentNumber']}",
+                                    "-1597166222": "@triggerBody()?['object']?['properties']?['classification']",
+                                    "-2092535003": "@triggerBody()?['object']?['properties']?['status']",
+                                    "-835147915": "@triggerBody()?['object']?['properties']?['owner']?['assignedTo']"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['wordonlinebusiness']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/api/templates/getFile",
+                                "queries": {
+                                    "drive": "",
+                                    "file": "",
+                                    "source": ""
+                                }
+                            }
+                        },
+                        "Send_an_email_(V2)": {
+                            "runAfter": {
+                                "Populate_a_Microsoft_Word_template": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "Attachments": [
+                                        {
+                                            "ContentBytes": "@{base64(body('Populate_a_Microsoft_Word_template'))}",
+                                            "Name": "@{triggerBody()?['object']?['properties']?['incidentNumber']}.docx"
+                                        }
+                                    ],
+                                    "Body": "<p>@{triggerBody()?['object']?['properties']?['description']}</p>",
+                                    "Importance": "Normal",
+                                    "Subject": "Incident @{triggerBody()?['object']?['properties']?['incidentNumber']} report",
+                                    "To": ""
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['office365']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/v2/Mail"
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": {
+                            "azuresentinel": {
+                                "connectionId": "[resourceId('Microsoft.Web/connections', variables('MicrosoftSentinelConnectionName'))]",
+                                "connectionName": "[variables('MicrosoftSentinelConnectionName')]",
+                                "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Azuresentinel')]",
+                                "connectionProperties": {
+                                    "authentication": {
+                                        "type": "ManagedServiceIdentity"
+                                    }
+                                }
+                            },
+                            "office365": {
+                                "connectionId": "[resourceId('Microsoft.Web/connections', variables('Office365ConnectionName'))]",
+                                "connectionName": "[variables('Office365ConnectionName')]",
+                                "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Office365')]"
+                            },
+                            "wordonlinebusiness": {
+                                "connectionId": "[resourceId('Microsoft.Web/connections', variables('WordonlinebusinessConnectionName'))]",
+                                "connectionName": "[variables('WordonlinebusinessConnectionName')]",
+                                "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Wordonlinebusiness')]"
+                            }
+                        }
+                    }
+                }
+            },
+            "name": "[parameters('PlaybookName')]",
+            "type": "Microsoft.Logic/workflows",
+            "location": "[resourceGroup().location]",
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "apiVersion": "2017-07-01",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/connections', variables('MicrosoftSentinelConnectionName'))]",
+                "[resourceId('Microsoft.Web/connections', variables('Office365ConnectionName'))]",
+                "[resourceId('Microsoft.Web/connections', variables('WordonlinebusinessConnectionName'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Web/connections",
+            "apiVersion": "2016-06-01",
+            "name": "[variables('MicrosoftSentinelConnectionName')]",
+            "location": "[resourceGroup().location]",
+            "kind": "V1",
+            "properties": {
+                "displayName": "[variables('MicrosoftSentinelConnectionName')]",
+                "customParameterValues": {},
+                "parameterValueType": "Alternative",
+                "api": {
+                    "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Azuresentinel')]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Web/connections",
+            "apiVersion": "2016-06-01",
+            "name": "[variables('Office365ConnectionName')]",
+            "location": "[resourceGroup().location]",
+            "kind": "V1",
+            "properties": {
+                "displayName": "[variables('Office365ConnectionName')]",
+                "customParameterValues": {},
+                "api": {
+                    "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Office365')]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Web/connections",
+            "apiVersion": "2016-06-01",
+            "name": "[variables('WordonlinebusinessConnectionName')]",
+            "location": "[resourceGroup().location]",
+            "kind": "V1",
+            "properties": {
+                "displayName": "[variables('WordonlinebusinessConnectionName')]",
+                "customParameterValues": {},
+                "api": {
+                    "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Wordonlinebusiness')]"
+                }
+            }
+        }
+    ]
+}
